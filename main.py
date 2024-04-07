@@ -41,23 +41,37 @@ response = requests.get(search_api_server, params=search_params)
 
 json_response = response.json()
 
-organization = json_response["features"][0]
-org_name = organization["properties"]["CompanyMetaData"]["name"]
-org_address = organization["properties"]["CompanyMetaData"]["address"]
-org_hours = organization["properties"]["CompanyMetaData"]["Hours"]["text"]
+point = toponym_point.copy()
+marks = []
 
-org_point = organization["geometry"]["coordinates"]
-point = [(org_point[0] + toponym_point[0]) / 2, (org_point[1] + toponym_point[1]) / 2]
+for i in range(10):
+    organization = json_response["features"][i]
+    org_name = organization["properties"]["CompanyMetaData"]["name"]
+    org_address = organization["properties"]["CompanyMetaData"]["address"]
+    org_hours = organization["properties"]["CompanyMetaData"]["Hours"]
 
-print("Адрес:", org_address)
-print("Название:", org_name)
-print("Время работы:", org_hours)
-print(f"Расстояние от исходной точки: {round(lonlat_distance(toponym_point, org_point), 3)}м")
+    org_point = organization["geometry"]["coordinates"]
+    point = [point[0] + org_point[0], point[1] + org_point[1]]
+
+    if not org_hours["Availabilities"]:
+        marks.append("{0},{1},pm2grl".format(*org_point))
+    elif "TwentyFourHours" in org_hours["Availabilities"][0] and "Everyday" in org_hours["Availabilities"][0]:
+        marks.append("{0},{1},pm2gnl".format(*org_point))
+    else:
+        marks.append("{0},{1},pm2bll".format(*org_point))
+
+    print(f"Аптека №{i + 1}")
+    print("\tАдрес:", org_address)
+    print("\tНазвание:", org_name)
+    print("\tВремя работы:", org_hours["text"])
+    print(f"\tРасстояние от исходной точки: {round(lonlat_distance(toponym_point, org_point), 3)}м")
+
+point = [point[0] / 11, point[1] / 11]
 
 map_params = {
     "ll": ",".join(map(str, point)),
     "l": "map",
-    "pt": "~".join([",".join([*map(str, toponym_point), "flag"]), "{0},{1},pm2dgl".format(*org_point)])
+    "pt": "~".join([",".join([*map(str, toponym_point), "flag"]), *marks])
 }
 map_api_server = "http://static-maps.yandex.ru/1.x/"
 response = requests.get(map_api_server, params=map_params)
